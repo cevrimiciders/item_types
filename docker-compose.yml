@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: olcme_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-olcme}
+      POSTGRES_USER: ${POSTGRES_USER:-olcme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mh197723}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: olcme_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: ./backend
+    container_name: olcme_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8000:8000"
+
+  worker:
+    build:
+      context: ./backend
+    container_name: olcme_worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+    command: ["celery", "-A", "app.core.celery_app:celery", "worker", "--loglevel=INFO", "--concurrency=1"]
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: olcme_frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE: "https://api.anket.olcme.tr"
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+volumes:
+  pg_data:
